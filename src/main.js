@@ -617,6 +617,66 @@ spotLight.penumbra = 0.1;
 scene.add(spotLight);
 scene.add(spotLight.target);
 
+// GLSL Shaders
+const vertexShader = `
+    varying vec2 vUv;
+    varying vec3 vPosition;
+    uniform float time;
+
+    void main() {
+        vUv = uv;
+        vPosition = position;
+
+        vec3 pos = position;
+        pos.z += sin(pos.x * 10.0 + time) * 0.1;
+        pos.z += sin(pos.y * 8.0 + time * 1.5) * 0.1;
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+    }
+`;
+
+const fragmentShader = `
+    uniform float time;
+    varying vec2 vUv;
+    varying vec3 vPosition;
+
+    void main() {
+        vec2 center = vec2(0.5, 0.5);
+        vec2 pos = vUv - center;
+
+        float dist = length(pos);
+        float wave = sin(dist * 20.0 - time * 3.0) * 0.5 + 0.5;
+
+        vec3 color1 = vec3(0.2, 0.4, 0.8); // Синий
+        vec3 color2 = vec3(0.8, 0.2, 0.4); // Розовый
+
+        vec3 finalColor = mix(color1, color2, wave);
+
+        // Добавим пульсирующий эффект
+        float pulse = sin(time * 2.0) * 0.3 + 0.7;
+        finalColor *= pulse;
+
+        gl_FragColor = vec4(finalColor, 1.0);
+    }
+`;
+
+// Создание материала с шейдерами
+const shaderMaterial = new THREE.ShaderMaterial({
+    vertexShader: vertexShader,
+    fragmentShader: fragmentShader,
+    uniforms: {
+        time: { value: 0.0 }
+    },
+    side: THREE.DoubleSide
+});
+
+// Создание плоскости с GLSL-эффектом
+const wavePlaneGeometry = new THREE.PlaneGeometry(4, 4, 50, 50);
+const wavePlane = new THREE.Mesh(wavePlaneGeometry, shaderMaterial);
+wavePlane.position.set(0, 0.1, 2);
+wavePlane.rotation.x = -Math.PI / 2;
+scene.add(wavePlane);
+
 const modelManager = new ModelManager(scene, camera, renderer, controls);
 const uiManager = new UIManager(modelManager, {
     directionalLight,
@@ -634,7 +694,8 @@ window.uiManager = uiManager;
 const builtInModels = [
     { object: pyramid, name: 'Пирамида' },
     { object: cube, name: 'Куб' },
-    { object: sphere, name: 'Сфера' }
+    { object: sphere, name: 'Сфера' },
+    { object: wavePlane, name: 'GLSL Волны' }
 ];
 
 builtInModels.forEach((model, index) => {
@@ -651,6 +712,9 @@ function animate() {
     if (modelManager.transformControls) {
         modelManager.transformControls.update();
     }
+
+    // Обновление времени для GLSL-шейдера
+    shaderMaterial.uniforms.time.value += 0.01;
 
     renderer.render(scene, camera);
 }
